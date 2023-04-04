@@ -1,0 +1,70 @@
+service: lucastest-appsync-poc
+frameworkVersion: "3"
+
+plugins:
+  - serverless-appsync-plugin
+
+provider:
+  name: aws
+  stage: ${opt:stage, "int"}
+  region: us-east-1
+
+functions:
+  lucastest:
+    name: ${self:service}-${self:provider.stage}-lucastest
+    handler: src/handlers/lucastest.handler
+    timeout: 30
+    memorySize: 1024
+
+appSync:
+  name: hello-appsync
+  authentication:
+    type: API_KEY
+  apiKeys:
+    - name: lucas-test
+      description: Lucas Test api key
+      expiresAfter: 1M
+  xrayEnabled: true
+  logging:
+    level: ALL
+    retentionInDays: 14
+
+  schema: "schema.graphql"
+
+  dataSources:
+    officeIdTable:
+      type: AMAZON_DYNAMODB
+      description: officeId cache table
+      config:
+        tableName: products
+    lucastest:
+      type: AWS_LAMBDA
+      config:
+        functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-lucastest"
+    officeIdFetchLambda:
+      type: AWS_LAMBDA
+      config:
+        functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-lucastest"
+
+  resolvers:
+    Query.getLucasTest:
+      functions:
+        - officeIdCacheResolver
+        - officeIdFetchResolver
+
+  pipelineFunctions:
+    ########### OFFICE ID ###########
+    officeIdCacheResolver:
+      dataSource: officeIdTable
+      description: "Fetch officeId from dynamodb cache given input parameters"
+      code: "./resolvers/officeIdCacheResolver.js"
+    officeIdFetchResolver:
+      dataSource: officeIdFetchLambda
+      description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
+      code: "./resolvers/officeIdFetchResolver.js"
+
+    ########### LFS ###########
+    # lfsResolver:
+    #   dataSource: officeIdFetchLambda
+    #   description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
+    #   code: "./resolvers/officeIdFetchResolver.js"

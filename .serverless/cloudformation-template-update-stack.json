@@ -1,0 +1,695 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "ServerlessDeploymentBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessDeploymentBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ServerlessDeploymentBucket"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      }
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "LucastestLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/lucastest-appsync-poc-int-lucastest"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "lucastest-appsync-poc",
+                  "int",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup",
+                    "logs:TagResource"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/lucastest-appsync-poc-int*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/lucastest-appsync-poc-int*:*:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "lucastest-appsync-poc",
+              "int",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "LucastestLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/lucastest-appsync-poc/int/1680611124677-2023-04-04T12:25:24.677Z/lucastest-appsync-poc.zip"
+        },
+        "Handler": "src/handlers/lucastest.handler",
+        "Runtime": "nodejs14.x",
+        "FunctionName": "lucastest-appsync-poc-int-lucastest",
+        "MemorySize": 1024,
+        "Timeout": 30,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "LucastestLogGroup"
+      ]
+    },
+    "LucastestLambdaVersionCorcDZFxq9T9z5f9ZiXMeNHKQIKlr1MB4unqrcL6LM": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "LucastestLambdaFunction"
+        },
+        "CodeSha256": "SthN5laVo+u8/qyJS1KLCoM+fz+9H5oa1DsyrAIZi3Q="
+      }
+    },
+    "GraphQlApi": {
+      "Type": "AWS::AppSync::GraphQLApi",
+      "Properties": {
+        "Name": "hello-appsync",
+        "XrayEnabled": true,
+        "AuthenticationType": "API_KEY",
+        "LogConfig": {
+          "CloudWatchLogsRoleArn": {
+            "Fn::GetAtt": [
+              "GraphQlApiLogGroupRole",
+              "Arn"
+            ]
+          },
+          "FieldLogLevel": "ALL"
+        }
+      }
+    },
+    "GraphQlSchema": {
+      "Type": "AWS::AppSync::GraphQLSchema",
+      "Properties": {
+        "Definition": "type Query {\r\n  getLucasTest: [Passenger!]!\r\n}\r\n\r\ntype Passenger {\r\n  name: String!\r\n}\r\n",
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        }
+      }
+    },
+    "GraphQlApiLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "/",
+            [
+              "/aws/appsync/apis",
+              {
+                "Fn::GetAtt": [
+                  "GraphQlApi",
+                  "ApiId"
+                ]
+              }
+            ]
+          ]
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "GraphQlApiLogGroupPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "GraphQlApiLogGroupPolicy",
+        "Roles": [
+          {
+            "Ref": "GraphQlApiLogGroupRole"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "GraphQlApiLogGroup",
+                    "Arn"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "GraphQlApiLogGroupRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "appsync.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "GraphQlApilucastest": {
+      "Type": "AWS::AppSync::ApiKey",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Description": "Lucas Test api key",
+        "Expires": 1683201600
+      }
+    },
+    "GraphQlDsofficeIdTable": {
+      "Type": "AWS::AppSync::DataSource",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Name": "officeIdTable",
+        "Description": "officeId cache table",
+        "Type": "AMAZON_DYNAMODB",
+        "DynamoDBConfig": {
+          "AwsRegion": {
+            "Ref": "AWS::Region"
+          },
+          "TableName": "products",
+          "UseCallerCredentials": false
+        },
+        "ServiceRoleArn": {
+          "Fn::GetAtt": [
+            "GraphQlDsofficeIdTableRole",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "GraphQlDsofficeIdTableRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "appsync.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "AppSync-Datasource-officeIdTable",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:ConditionCheckItem"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "/",
+                        [
+                          {
+                            "Fn::Join": [
+                              ":",
+                              [
+                                "arn",
+                                "aws",
+                                "dynamodb",
+                                {
+                                  "Ref": "AWS::Region"
+                                },
+                                {
+                                  "Ref": "AWS::AccountId"
+                                },
+                                "table"
+                              ]
+                            ]
+                          },
+                          "products"
+                        ]
+                      ]
+                    },
+                    {
+                      "Fn::Join": [
+                        "/",
+                        [
+                          {
+                            "Fn::Join": [
+                              ":",
+                              [
+                                "arn",
+                                "aws",
+                                "dynamodb",
+                                {
+                                  "Ref": "AWS::Region"
+                                },
+                                {
+                                  "Ref": "AWS::AccountId"
+                                },
+                                "table"
+                              ]
+                            ]
+                          },
+                          "products",
+                          "*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "GraphQlDslucastest": {
+      "Type": "AWS::AppSync::DataSource",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Name": "lucastest",
+        "Type": "AWS_LAMBDA",
+        "LambdaConfig": {
+          "LambdaFunctionArn": {
+            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+          }
+        },
+        "ServiceRoleArn": {
+          "Fn::GetAtt": [
+            "GraphQlDslucastestRole",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "GraphQlDslucastestRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "appsync.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "AppSync-Datasource-lucastest",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "lambda:invokeFunction"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+                    },
+                    {
+                      "Fn::Join": [
+                        ":",
+                        [
+                          {
+                            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+                          },
+                          "*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "GraphQlDsofficeIdFetchLambda": {
+      "Type": "AWS::AppSync::DataSource",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Name": "officeIdFetchLambda",
+        "Type": "AWS_LAMBDA",
+        "LambdaConfig": {
+          "LambdaFunctionArn": {
+            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+          }
+        },
+        "ServiceRoleArn": {
+          "Fn::GetAtt": [
+            "GraphQlDsofficeIdFetchLambdaRole",
+            "Arn"
+          ]
+        }
+      }
+    },
+    "GraphQlDsofficeIdFetchLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "appsync.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "AppSync-Datasource-officeIdFetchLambda",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "lambda:invokeFunction"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+                    },
+                    {
+                      "Fn::Join": [
+                        ":",
+                        [
+                          {
+                            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:lucastest-appsync-poc-int-lucastest"
+                          },
+                          "*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "GraphQlFunctionConfigurationofficeIdCacheResolver": {
+      "Type": "AWS::AppSync::FunctionConfiguration",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Name": "officeIdCacheResolver",
+        "DataSourceName": {
+          "Fn::GetAtt": [
+            "GraphQlDsofficeIdTable",
+            "Name"
+          ]
+        },
+        "Description": "Fetch officeId from dynamodb cache given input parameters",
+        "FunctionVersion": "2018-05-29",
+        "Code": "import { util } from '@aws-appsync/utils';\r\nexport function request (ctx) {\r\n  // (TODO): Fetch the officeId from the dynamodb cache table with appropriate key from args\r\n  console.log('officeIdCacheResolver.request()');\r\n  const {\r\n    id\r\n  } = ctx.args;\r\n\r\n  return { operation: 'GetItem', key: util.dynamodb.toMapValues({ id: id || '123' }) };\r\n}\r\n\r\nexport function response (ctx) {\r\n  // Pass result to the next resolver in pipeline\r\n  const { error, result } = ctx;\r\n  console.log('officeIdCacheResolver.response()', result);\r\n  if (error) {\r\n    console.log('Error in officeIdCacheResolver.response(): ', error);\r\n    return util.appendError(error.message, error.type, result);\r\n  }\r\n\r\n  return result;\r\n}\r\n",
+        "Runtime": {
+          "Name": "APPSYNC_JS",
+          "RuntimeVersion": "1.0.0"
+        }
+      }
+    },
+    "GraphQlFunctionConfigurationofficeIdFetchResolver": {
+      "Type": "AWS::AppSync::FunctionConfiguration",
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "Name": "officeIdFetchResolver",
+        "DataSourceName": {
+          "Fn::GetAtt": [
+            "GraphQlDsofficeIdFetchLambda",
+            "Name"
+          ]
+        },
+        "Description": "Fetch officeId from external API given input parameters and stores result in dynamodb cache",
+        "FunctionVersion": "2018-05-29",
+        "Code": "import { util } from '@aws-appsync/utils';\r\nexport function request (ctx) {\r\n  // Inspect previous resolver result\r\n  console.log('officeIdFetchResolver.request()', ctx.result, ctx.prev.result);\r\n  return {\r\n    version: \"2018-05-29\",\r\n    operation: \"Invoke\",\r\n    payload: {\r\n      type: \"Query\",\r\n      field: \"getLucasTest\",\r\n      arguments: {\r\n        previousResult: !!ctx.prev.result ? ctx.prev.result : null,\r\n      }\r\n    }\r\n  };\r\n}\r\n\r\nexport function response (ctx) {\r\n  console.log('officeIdFetchResolver.response()', ctx.result, ctx.prev.result, ctx.stash);\r\n\r\n  if (ctx.stash && ctx.stash.officeIdCacheResult) {\r\n    console.log('officeIdFetchResolver.response() - returning cached result');\r\n    return JSON.stringify([{ name: ctx.stash.officeIdCacheResult }]);\r\n  }\r\n\r\n  if (ctx.prev.result && ctx.prev.result.length > 0) {\r\n    return JSON.stringify([{ name: 'early return' }]);\r\n  }\r\n\r\n  return JSON.stringify([{ name: 'normal return' }]);\r\n}\r\n",
+        "Runtime": {
+          "Name": "APPSYNC_JS",
+          "RuntimeVersion": "1.0.0"
+        }
+      }
+    },
+    "GraphQlResolverQuerygetLucasTest": {
+      "Type": "AWS::AppSync::Resolver",
+      "DependsOn": [
+        "GraphQlSchema"
+      ],
+      "Properties": {
+        "ApiId": {
+          "Fn::GetAtt": [
+            "GraphQlApi",
+            "ApiId"
+          ]
+        },
+        "TypeName": "Query",
+        "FieldName": "getLucasTest",
+        "Code": "\nexport function request() {\n  return {};\n}\n\nexport function response(ctx) {\n  return ctx.prev.result;\n}\n",
+        "Runtime": {
+          "Name": "APPSYNC_JS",
+          "RuntimeVersion": "1.0.0"
+        },
+        "Kind": "PIPELINE",
+        "PipelineConfig": {
+          "Functions": [
+            {
+              "Fn::GetAtt": [
+                "GraphQlFunctionConfigurationofficeIdCacheResolver",
+                "FunctionId"
+              ]
+            },
+            {
+              "Fn::GetAtt": [
+                "GraphQlFunctionConfigurationofficeIdFetchResolver",
+                "FunctionId"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": {
+        "Ref": "ServerlessDeploymentBucket"
+      },
+      "Export": {
+        "Name": "sls-lucastest-appsync-poc-int-ServerlessDeploymentBucketName"
+      }
+    },
+    "LucastestLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "LucastestLambdaVersionCorcDZFxq9T9z5f9ZiXMeNHKQIKlr1MB4unqrcL6LM"
+      },
+      "Export": {
+        "Name": "sls-lucastest-appsync-poc-int-LucastestLambdaFunctionQualifiedArn"
+      }
+    }
+  }
+}
