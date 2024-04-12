@@ -1,0 +1,61 @@
+pipelineFunctions:
+  lucastest:
+    dataSource: lucastestDs
+    description: "lucas test"
+    code: "./resolvers/lucastest.js"
+  ########### OFFICE ID ###########
+  officeIdCacheResolver:
+    dataSource: testTableDs
+    description: "Fetch officeId from dynamodb cache given input parameters"
+    code: "./resolvers/officeIdCacheResolver.js"
+  officeIdFetchResolver:
+    dataSource: officeIdFetchLambda
+    description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
+    code: "./resolvers/officeIdFetchResolver.js"
+    # request: "./resolvers/officeIdFetch.request.vtl"
+    # response: "./resolvers/officeIdFetch.response.vtl"
+  flightsearchResolver:
+    dataSource: flightsearchDs
+    description: "lfs resolver"
+    code: "./resolvers/flightsearchResolver.js"
+
+  ########### shoppin cart poc ###########
+  shoppingCartResolver:
+    dataSource: shoppingCartDs
+    description: "shopping cart resolver"
+    code: "./resolvers/Query.shoppingCartResolver.js"
+
+  lucasTest3Resolver:
+    dataSource: lucasTest3Ds
+    description: "lucasTest3 resolver"
+    code: "./resolvers/Query.getLucasTest3.js"
+
+  lfsResolver:
+    dataSource: lfsDs
+    description: "lfs resolver"
+    code: "./resolvers/Query.lfs.js"
+
+  addPassengersResolver:
+    dataSource: addPassengersDs
+    description: "addPassengers resolver"
+    code: "./resolvers/addPassengers.js"
+
+  retrieveMiniRulesResolver:
+    dataSource: retrieveMiniRulesDs
+    description: "retrieveMiniRules resolver"
+    code: "./resolvers/Query.retrieveMiniRules.js"
+
+  orderCreation:
+    dataSource: shoppingCartDs
+    description: "order creation resolver"
+    code: "./resolvers/orderCreation.js"
+
+  getPaymentSession:
+    dataSource: lucastestDs
+    description: "get payment session"
+    code: "./resolvers/getPaymentSession.js"
+
+  updateLfsEupgrade:
+    dataSource: lfsUpdateEupgradeDs
+    description: "update lfs"
+    code: "./resolvers/updateLfs.js"

@@ -1,10 +1,14 @@
-import { util } from '@aws-appsync/utils';
 export function request (ctx) {
   // Inspect previous resolver result
   console.log('officeIdFetchResolver.request()', ctx.result, ctx.prev.result);
 
-  if (ctx.prev.result) {
-    return ctx.prev.result;
+  const {
+    officeIdResult,
+    input
+  } = ctx.prev.result;
+
+  if (officeIdResult && officeIdResult.id) {
+    runtime.earlyReturn(officeIdResult);
   }
 
   return {
@@ -14,7 +18,7 @@ export function request (ctx) {
       type: "Query",
       field: "getLucasTest",
       arguments: {
-        previousResult: !!ctx.prev.result ? ctx.prev.result : null,
+        id: input.id,
       }
     }
   };
@@ -22,10 +26,5 @@ export function request (ctx) {
 
 export function response (ctx) {
   console.log('officeIdFetchResolver.response()', ctx.result, ctx.prev.result, ctx.stash);
-
-  if (ctx.result) {
-    return ctx.result;
-  }
-
-  return JSON.stringify([{ name: 'normal return' }]);
+  return ctx.result;
 }

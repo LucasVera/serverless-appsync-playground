@@ -1,0 +1,17 @@
+$util.log.info("officeIdFetch request resolver result: {}", $context.prev.result)
+
+#if($context.prev.result && $context.prev.result.officeIdResult && $context.prev.result.officeIdResult.id)
+  $util.log.info("if yielded true")
+  #return($util.toJson({officeId:$context.prev.result.officeIdResult.id}))
+#else
+  $util.log.info("if yielded false")
+  {
+    "version": "2017-02-28",
+    "operation": "Invoke",
+    "payload": {
+      "arguments": {
+        "officeIdCache": false
+      }
+    }
+  }
+#end

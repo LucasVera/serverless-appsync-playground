@@ -8,6 +8,12 @@ provider:
   name: aws
   stage: ${opt:stage, "int"}
   region: us-east-1
+  runtime: nodejs18.x
+  iam:
+    role: !GetAtt [HelloAppsyncRole, Arn]
+  environment:
+    SECRETS_MANAGER_ENDPOINT: "https://secretsmanager.us-east-1.amazonaws.com"
+    CONTENT_BUCKET_NAME: "aco-content-bucket"
 
 functions:
   lucastest:
@@ -15,56 +21,797 @@ functions:
     handler: src/handlers/lucastest.handler
     timeout: 30
     memorySize: 1024
+    # vpc:
+    #   securityGroupIds:
+    #     - sg-06853f0401ec53f3c
+    #   subnetIds:
+    #     - subnet-002fff36e4bea3028
+    #     - subnet-09dd5dbb49db55342
+    #     - subnet-097e4f7a7c63783d8
+    #     - subnet-0589c6e3c5a229899
+    #     - subnet-00dd87e099d2365ef
+    #     - subnet-071c1689326157804
+  flightsearch:
+    name: ${self:service}-${self:provider.stage}-flightsearch
+    handler: src/handlers/flightsearch.handler
+    timeout: 30
+    memorySize: 1024
+  updatePassengers:
+    name: ${self:service}-${self:provider.stage}-updatePassengers
+    handler: src/handlers/updatePassengers.handler
+    timeout: 30
+    memorySize: 1024
+  eventBridgeTest:
+    name: ${self:service}-${self:provider.stage}-eventBridgeTest
+    handler: src/handlers/eventBridgeTest.handler
+    timeout: 30
+    memorySize: 1024
+    events:
+      - httpApi:
+          path: /eventBridgeTest
+          method: get
+  rotateSecret:
+    name: ${self:service}-${self:provider.stage}-rotateSecret
+    handler: src/handlers/rotateSecret.handler
+    timeout: 30
+    memorySize: 1024
+  frictionlessStepFunctionTest:
+    name: ${self:service}-${self:provider.stage}-frictionlessStepFunctionTest
+    handler: src/handlers/frictionlessStepFunctionTest.handler
+    timeout: 30
+    memorySize: 1024
+  updateLfsEupgrade:
+    name: ${self:service}-${self:provider.stage}-updateLfsEupgrade
+    handler: src/handlers/updateLfsEupgrade.handler
+    timeout: 30
+    memorySize: 1024
+  contentJsonFileValidator:
+    name: ${self:service}-${self:provider.stage}-contentJsonFileValidator
+    handler: src/handlers/contentJsonFileValidator.handler
+    timeout: 30
+    memorySize: 1024
+    events:
+      - s3:
+          bucket: ${self:provider.environment.CONTENT_BUCKET_NAME}
+          event: s3:ObjectCreated:*
+          existing: true
+          rules:
+            - prefix: aco-content-file-prefix/
+            - suffix: .json
 
 appSync:
-  name: hello-appsync
+  name: hello-appsync-${self:provider.stage}
   authentication:
-    type: API_KEY
+    type: AWS_IAM
+  additionalAuthentications:
+    - type: API_KEY
   apiKeys:
     - name: lucas-test
       description: Lucas Test api key
-      expiresAfter: 1M
+      expiresAfter: 1y
   xrayEnabled: true
   logging:
-    level: ALL
+    level: NONE
+    enabled: false
     retentionInDays: 14
+    roleArn: !GetAtt [HelloAppsyncRole, Arn]
+  introspection: false
 
   schema: "schema.graphql"
 
   dataSources:
-    officeIdTable:
+    testTableDs:
       type: AMAZON_DYNAMODB
-      description: officeId cache table
+      description: testTable
       config:
-        tableName: products
-    lucastest:
+        tableName: testTable
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    lucastestDs:
       type: AWS_LAMBDA
       config:
         functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-lucastest"
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
     officeIdFetchLambda:
       type: AWS_LAMBDA
       config:
         functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-lucastest"
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    flightsearchDs:
+      type: AWS_LAMBDA
+      config:
+        functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-flightsearch"
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    shoppingCartDs:
+      type: AMAZON_DYNAMODB
+      description: shopping cart table
+      config:
+        tableName: shopping-cart-poc
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    lfsDs:
+      type: AMAZON_DYNAMODB
+      description: lfs table
+      config:
+        tableName: lfsCachePoc
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    lucasTest3Ds:
+      type: NONE
+    addPassengersDs:
+      type: AMAZON_DYNAMODB
+      description: shopping cart table
+      config:
+        tableName: shopping-cart-poc
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    retrieveMiniRulesDs:
+      type: AMAZON_DYNAMODB
+      description: shopping cart table
+      config:
+        tableName: shopping-cart-poc
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    paymentSessionDs:
+      type: AMAZON_DYNAMODB
+      description: payment session table
+      config:
+        tableName: payment-session-poc
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    frictionlessPaymentLambdaDs:
+      type: AWS_LAMBDA
+      config:
+        functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-frictionlessStepFunctionTest"
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
+    lfsUpdateEupgradeDs:
+      type: AWS_LAMBDA
+      config:
+        functionArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${self:service}-${self:provider.stage}-updateLfsEupgrade"
+        serviceRoleArn: !GetAtt [HelloAppsyncRole, Arn]
 
   resolvers:
-    Query.getLucasTest:
+    Query.getOfficeId:
       functions:
         - officeIdCacheResolver
         - officeIdFetchResolver
+        - flightsearchResolver
 
-  pipelineFunctions:
-    ########### OFFICE ID ###########
-    officeIdCacheResolver:
-      dataSource: officeIdTable
-      description: "Fetch officeId from dynamodb cache given input parameters"
-      code: "./resolvers/officeIdCacheResolver.js"
-    officeIdFetchResolver:
-      dataSource: officeIdFetchLambda
-      description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
-      code: "./resolvers/officeIdFetchResolver.js"
+    Query.getLucasTest:
+      functions:
+        - lucastest
 
-    ########### LFS ###########
-    # lfsResolver:
-    #   dataSource: officeIdFetchLambda
-    #   description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
-    #   code: "./resolvers/officeIdFetchResolver.js"
+    Query.getLucasTest2:
+      functions:
+        - shoppingCartResolver
+
+    Query.getLucasTest3:
+      functions:
+        - lucasTest3Resolver
+
+    Query.lfs:
+      functions:
+        - lfsResolver
+
+    Query.retrieveMiniRules:
+      functions:
+        - retrieveMiniRulesResolver
+
+    Mutation.addPassengers:
+      functions:
+        - addPassengersResolver
+
+    Mutation.orderCreation:
+      functions:
+        - orderCreation
+
+    Query.getPaymentSession:
+      functions:
+        - getPaymentSession
+
+    Query.updateLfsEupgrade:
+      functions:
+        - updateLfsEupgrade
+
+  pipelineFunctions: ${file(./pipelineFunctions.yml):pipelineFunctions}
+
+resources:
+  AWSTemplateFormatVersion: "2010-09-09"
+  Resources:
+    HelloAppsyncRole: ${file(./role.yml)}
+
+    AppSyncLogsSubscriptionFilter:
+      Type: "AWS::Logs::SubscriptionFilter"
+      Properties:
+        DestinationArn: !GetAtt AppSyncLogsSubscription.Arn
+        FilterPattern: "ERROR"
+        LogGroupName: !Sub "/aws/appsync/apis/${self:provider.stage}/${self:service}"
+
+    MySNSTopic:
+      Type: AWS::SNS::Topic
+
+    SQSQueue1:
+      Type: AWS::SQS::Queue
+
+    SQSQueue1Policy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref SQSQueue1
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              # Principal: "*"
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt SQSQueue1.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref MySNSTopic
+
+    SQSQueue2:
+      Type: AWS::SQS::Queue
+
+    SQSQueue2Policy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref SQSQueue2
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt SQSQueue2.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref MySNSTopic
+
+    SQSQueueDLQ:
+      Type: AWS::SQS::Queue
+
+    SQSQueue1Subscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref MySNSTopic
+        Protocol: sqs
+        Endpoint: !GetAtt SQSQueue1.Arn
+        FilterPolicyScope: MessageBody
+        FilterPolicy:
+          acoType:
+            - "sqs1"
+
+    SQSQueue2Subscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref MySNSTopic
+        Protocol: sqs
+        Endpoint: !GetAtt SQSQueue2.Arn
+        FilterPolicyScope: MessageBody
+        FilterPolicy:
+          acoType:
+            - "sqs2"
+
+    SNSTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        Topics:
+          - !Ref MySNSTopic
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              # Principal: "*"
+              Principal:
+                AWS:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:root
+              Action: sns:Publish
+              Resource: !Ref MySNSTopic
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !GetAtt SQSQueueDLQ.Arn
+
+    ##### ---- Step function ---- #####
+    PaymentFlowStateMachine:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+        StateMachineName: PaymentFlowStateMachine-${self:provider.stage}
+        DefinitionString:
+          Fn::Sub: |
+            {
+              "Comment": "A state machine that orchestrates multiple Lambda functions based on success/failure conditions.",
+              "StartAt": "Fetch Shopping Cart",
+              "States": {
+                "Fetch Shopping Cart": {
+                  "Type": "Task",
+                  "Parameters": {
+                    "TableName": "shopping-cart-poc",
+                    "KeyConditionExpression": "#ShoppingCartIdColumn = :ShoppingCartIdValue AND begins_with(#SkColumn, :SkValue)",
+                    "ExpressionAttributeNames": {
+                      "#ShoppingCartIdColumn": "ShoppingCartId",
+                      "#SkColumn": "SK"
+                    },
+                    "ExpressionAttributeValues": {
+                      ":ShoppingCartIdValue": {
+                        "S.$": "$.input.ShoppingCartId"
+                      },
+                      ":SkValue": {
+                        "S.$": "States.Format('session#{}', $.input.BookingSessionId)"
+                      }
+                    },
+                    "ConsistentRead": true
+                  },
+                  "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+                  "Next": "Data Fetch Result",
+                  "ResultPath": "$.bookingData",
+                  "ResultSelector": {
+                    "ShoppingCart.$": "$.Items"
+                  }
+                },
+                "Data Fetch Result": {
+                  "Type": "Choice",
+                  "Choices": [
+                    {
+                      "And": [
+                        {
+                          "Variable": "$.bookingData.ShoppingCart",
+                          "IsPresent": true
+                        },
+                        {
+                          "Variable": "$.bookingData.ShoppingCart[0]",
+                          "IsPresent": true
+                        },
+                        {
+                          "Variable": "$.bookingData.ShoppingCart[0].ShoppingCartId.S",
+                          "StringEqualsPath": "$.input.ShoppingCartId"
+                        }
+                      ],
+                      "Comment": "Data Found",
+                      "Next": "Authorize Payment"
+                    },
+                    {
+                      "Or": [
+                        {
+                          "Not": {
+                            "Variable": "$.bookingData.ShoppingCart",
+                            "IsPresent": true
+                          }
+                        }
+                      ],
+                      "Comment": "Data Not Found",
+                      "Next": "Format Session Expired Error"
+                    }
+                  ]
+                },
+                "Format Session Expired Error": {
+                  "Type": "Pass",
+                  "Next": "Set status to \"Authorize Failure\"",
+                  "Parameters": {
+                    "step": "authorize",
+                    "bookingData": null,
+                    "input.$": "$.input",
+                    "result.$": "$.result",
+                    "warnings.$": "$.warnings",
+                    "sessionData.$": "$.sessionData",
+                    "errors": [
+                      {
+                        "friendlyCode": null,
+                        "systemErrorCode": "",
+                        "systemErrorMessage": "Your session has expired",
+                        "systemService": "Purchase",
+                        "systemSubService": "Authorize-Payment"
+                      }
+                    ]
+                  }
+                },
+                "Authorize Payment": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::lambda:invoke",
+                  "Parameters": {
+                    "FunctionName": "arn:aws:lambda:us-east-1:747016795213:function:log-input:$LATEST",
+                    "Payload": {
+                      "step": "authorize",
+                      "bookingData.$": "$.bookingData",
+                      "input.$": "$.input",
+                      "result.$": "$.result",
+                      "errors.$": "$.errors",
+                      "warnings.$": "$.warnings",
+                      "sessionData.$": "$.sessionData"
+                    }
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "States.TaskFailed"
+                      ],
+                      "BackoffRate": 2,
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 1,
+                      "Comment": "Retry on 500 error or timeout from EIP"
+                    },
+                    {
+                      "ErrorEquals": [
+                        "States.ALL"
+                      ],
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 3,
+                      "BackoffRate": 2,
+                      "Comment": "AWS Lambda Service Errors Retrier"
+                    }
+                  ],
+                  "Next": "Authorize Payment Result",
+                  "Catch": [
+                    {
+                      "ErrorEquals": [
+                        "States.ALL"
+                      ],
+                      "Next": "Format Default Authorize Error",
+                      "Comment": "Max retries reached",
+                      "ResultPath": "$.error"
+                    }
+                  ],
+                  "OutputPath": "$.Payload"
+                },
+                "Format Default Authorize Error": {
+                  "Type": "Pass",
+                  "Next": "Set status to \"Authorize Failure\"",
+                  "Parameters": {
+                    "step": "authorize",
+                    "bookingData.$": "$.bookingData",
+                    "input.$": "$.input",
+                    "result.$": "$.result",
+                    "warnings.$": "$.warnings",
+                    "sessionData.$": "$.sessionData",
+                    "errors": [
+                      {
+                        "friendlyCode": null,
+                        "systemErrorCode": "",
+                        "systemErrorMessage.$": "$.error.Cause",
+                        "systemService": "Purchase",
+                        "systemSubService": "Authorize-Payment"
+                      }
+                    ]
+                  }
+                },
+                "Authorize Payment Result": {
+                  "Type": "Choice",
+                  "Choices": [
+                    {
+                      "Variable": "$.result",
+                      "StringEquals": "Authorize Success",
+                      "Comment": "Authorize Success",
+                      "Next": "Set status to \"Authorize Success\""
+                    },
+                    {
+                      "Variable": "$.result",
+                      "StringEquals": "Authorize Failure",
+                      "Comment": "Non-retriable Error",
+                      "Next": "Set status to \"Authorize Failure\""
+                    }
+                  ]
+                },
+                "Set status to \"Authorize Success\"": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::dynamodb:updateItem",
+                  "Parameters": {
+                    "TableName": "purchase-session-poc",
+                    "Key": {
+                      "PurchaseSessionId": {
+                        "S.$": "$.input.PurchaseSessionId"
+                      },
+                      "SK": {
+                        "S": "details#"
+                      }
+                    },
+                    "UpdateExpression": "SET #StatusColumn = :AuthorizeSuccessStatusValue",
+                    "ExpressionAttributeNames": {
+                      "#StatusColumn": "PaymentStatus"
+                    },
+                    "ExpressionAttributeValues": {
+                      ":AuthorizeSuccessStatusValue": {
+                        "S": "Authorize Success"
+                      }
+                    },
+                    "ConditionExpression": "attribute_exists(SK)"
+                  },
+                  "ResultPath": null,
+                  "Next": "Ticketing"
+                },
+                "Ticketing": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::lambda:invoke",
+                  "OutputPath": "$.Payload",
+                  "Parameters": {
+                    "Payload": {
+                      "step": "ticketing",
+                      "bookingData.$": "$.bookingData",
+                      "input.$": "$.input",
+                      "result.$": "$.result",
+                      "errors.$": "$.errors",
+                      "warnings.$": "$.warnings",
+                      "sessionData.$": "$.sessionData"
+                    },
+                    "FunctionName": "arn:aws:lambda:us-east-1:747016795213:function:log-input:$LATEST"
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "States.TaskFailed"
+                      ],
+                      "BackoffRate": 2,
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 3,
+                      "Comment": "Retry on 500 error or timeout from EIP"
+                    },
+                    {
+                      "ErrorEquals": [
+                        "States.ALL"
+                      ],
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 3,
+                      "BackoffRate": 2,
+                      "Comment": "AWS Lambda Service Errors Retrier"
+                    }
+                  ],
+                  "Catch": [
+                    {
+                      "ErrorEquals": [
+                        "States.ALL"
+                      ],
+                      "Next": "Format Default Ticketing Error",
+                      "Comment": "Max retries reached",
+                      "ResultPath": "$.error"
+                    }
+                  ],
+                  "Next": "Ticketing Result"
+                },
+                "Format Default Ticketing Error": {
+                  "Type": "Pass",
+                  "Next": "Set status to \"Ticketing Failure\"",
+                  "Parameters": {
+                    "step": "ticketing",
+                    "bookingData.$": "$.bookingData",
+                    "input.$": "$.input",
+                    "result.$": "$.result",
+                    "warnings.$": "$.warnings",
+                    "sessionData.$": "$.sessionData",
+                    "errors": [
+                      {
+                        "friendlyCode": null,
+                        "systemErrorCode": "",
+                        "systemErrorMessage.$": "$.error.Cause",
+                        "systemService": "Purchase",
+                        "systemSubService": "Ticketing"
+                      }
+                    ]
+                  }
+                },
+                "Ticketing Result": {
+                  "Type": "Choice",
+                  "Choices": [
+                    {
+                      "Variable": "$.result",
+                      "StringEquals": "Ticketing Success",
+                      "Next": "Set status to \"Ticketing Success\"",
+                      "Comment": "Ticketing Success"
+                    },
+                    {
+                      "Variable": "$.result",
+                      "StringEquals": "Ticketing Failure",
+                      "Next": "Set status to \"Ticketing Failure\"",
+                      "Comment": "Non-retriable Error"
+                    }
+                  ]
+                },
+                "Set status to \"Ticketing Success\"": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::dynamodb:updateItem",
+                  "Parameters": {
+                    "TableName": "purchase-session-poc",
+                    "Key": {
+                      "PurchaseSessionId": {
+                        "S.$": "$.input.PurchaseSessionId"
+                      },
+                      "SK": {
+                        "S": "details#"
+                      }
+                    },
+                    "UpdateExpression": "SET #StatusColumn = :TicketingSuccessStatusValue",
+                    "ExpressionAttributeNames": {
+                      "#StatusColumn": "PaymentStatus"
+                    },
+                    "ExpressionAttributeValues": {
+                      ":TicketingSuccessStatusValue": {
+                        "S": "Ticketing Success"
+                      }
+                    },
+                    "ConditionExpression": "attribute_exists(SK)"
+                  },
+                  "ResultPath": null,
+                  "Next": "Call Notification Mutation"
+                },
+                "Set status to \"Authorize Failure\"": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::dynamodb:updateItem",
+                  "Parameters": {
+                    "TableName": "purchase-session-poc",
+                    "Key": {
+                      "PurchaseSessionId": {
+                        "S.$": "$.input.PurchaseSessionId"
+                      },
+                      "SK": {
+                        "S": "details#"
+                      }
+                    },
+                    "UpdateExpression": "SET #StatusColumn = :AuthorizeFailureStatusValue",
+                    "ExpressionAttributeNames": {
+                      "#StatusColumn": "PaymentStatus"
+                    },
+                    "ExpressionAttributeValues": {
+                      ":AuthorizeFailureStatusValue": {
+                        "S": "Authorize Failure"
+                      }
+                    },
+                    "ConditionExpression": "attribute_exists(SK)"
+                  },
+                  "ResultPath": null,
+                  "Next": "Exception Handler"
+                },
+                "Exception Handler": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::lambda:invoke",
+                  "Parameters": {
+                    "FunctionName": "arn:aws:lambda:us-east-1:747016795213:function:log-input:$LATEST",
+                    "Payload": {
+                      "step": "exceptions",
+                      "errors.$": "$.errors",
+                      "warnings.$": "$.warnings"
+                    }
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException",
+                        "Lambda.TooManyRequestsException"
+                      ],
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 3,
+                      "BackoffRate": 2
+                    }
+                  ],
+                  "Next": "Format Resulting Exceptions",
+                  "ResultPath": "$.exceptions"
+                },
+                "Format Resulting Exceptions": {
+                  "Type": "Pass",
+                  "Next": "Call Notification Mutation",
+                  "Parameters": {
+                    "step": "exceptions",
+                    "bookingData.$": "$.bookingData",
+                    "input.$": "$.input",
+                    "result.$": "$.result",
+                    "sessionData.$": "$.sessionData",
+                    "warnings.$": "$.exceptions.Payload.warnings",
+                    "errors.$": "$.exceptions.Payload.errors"
+                  }
+                },
+                "Call Notification Mutation": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::lambda:invoke",
+                  "Parameters": {
+                    "FunctionName": "arn:aws:lambda:us-east-1:747016795213:function:log-input:$LATEST",
+                    "Payload": {
+                      "step": "notification",
+                      "bookingData.$": "$.bookingData",
+                      "input.$": "$.input",
+                      "result.$": "$.result",
+                      "errors.$": "$.errors",
+                      "warnings.$": "$.warnings",
+                      "sessionData.$": "$.sessionData"
+                    }
+                  },
+                  "Retry": [
+                    {
+                      "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException",
+                        "Lambda.TooManyRequestsException"
+                      ],
+                      "IntervalSeconds": 1,
+                      "MaxAttempts": 3,
+                      "BackoffRate": 2
+                    }
+                  ],
+                  "End": true,
+                  "Comment": "Lambda that calls the mutation to notify the frontend via subscription",
+                  "OutputPath": "$.Payload"
+                },
+                "Set status to \"Ticketing Failure\"": {
+                  "Type": "Task",
+                  "Resource": "arn:aws:states:::dynamodb:updateItem",
+                  "Parameters": {
+                    "TableName": "purchase-session-poc",
+                    "Key": {
+                      "PurchaseSessionId": {
+                        "S.$": "$.input.PurchaseSessionId"
+                      },
+                      "SK": {
+                        "S": "details#"
+                      }
+                    },
+                    "UpdateExpression": "SET #StatusColumn = :TicketingFailureStatusValue",
+                    "ExpressionAttributeNames": {
+                      "#StatusColumn": "PaymentStatus"
+                    },
+                    "ExpressionAttributeValues": {
+                      ":TicketingFailureStatusValue": {
+                        "S": "Ticketing Failure"
+                      }
+                    },
+                    "ConditionExpression": "attribute_exists(SK)"
+                  },
+                  "ResultPath": null,
+                  "Next": "Call Notification Mutation"
+                }
+              }
+            }
+
+        RoleArn:
+          Fn::GetAtt: ["StateMachineRole", "Arn"]
+
+    StateMachineRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        RoleName: "StateMachineExecutionRole"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Service:
+                  - "states.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        Policies:
+          - PolicyName: "StatesExecutionPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "lambda:InvokeFunction"
+                    - "dynamodb:*"
+                    - "logs:CreateLogGroup"
+                    - "logs:CreateLogStream"
+                    - "logs:PutLogEvents"
+                  Resource: "*"
+########### LFS ###########
+# lfsResolver:
+#   dataSource: officeIdFetchLambda
+#   description: "Fetch officeId from external API given input parameters and stores result in dynamodb cache"
+#   code: "./resolvers/officeIdFetchResolver.js"
+# resources:
+# Resources:
+# Secret manager secret with a lambda function to automatically rotate the secret
+# https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets-lambda-function-overview.html
+
+# PublicKeySecret:
+#   Type: AWS::SecretsManager::Secret
+#   Properties:
+#     Description: "Secret for storing the public key for jwt verification"
+#     Name: ${self:service}-${self:provider.stage}-public-key
+
+# PrivateKeySecret:
+#   Type: AWS::SecretsManager::Secret
+#   Properties:
+#     Description: "Secret for storing the private key for jwt signing"
+#     Name: ${self:service}-${self:provider.stage}-private-key
+
+# MySecretRotationSchedule:
+#   Type: AWS::SecretsManager::RotationSchedule
+#   Properties:
+#     SecretId: !Ref MySecret
+#     RotateImmediatelyOnUpdate: true
+#     RotationLambdaARN: !GetAtt rotateSecret.Arn
+#     RotationRules:
+#       AutomaticallyAfterDays: 1
+

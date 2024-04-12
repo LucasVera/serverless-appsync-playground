@@ -1,7 +1,94 @@
 type Query {
-  getLucasTest: [Passenger!]!
+  getOfficeId(
+    input: PassengerInput
+  ): [Passenger!]! @aws_api_key @aws_iam
+
+  getLucasTest(
+    input: PassengerInput
+  ): [Passenger!]! @aws_api_key @aws_iam
+
+  getLucasTest2 (
+    input: PassengerInput
+  ): [Passenger!]! @aws_api_key @aws_iam
+
+  getLucasTest3 (
+    input: LucasTest3Input
+  ): LucasTest3Response @aws_iam
+
+  lfs(
+    input: LfsInput
+  ): Passenger @aws_api_key @aws_iam
+
+  retrieveMiniRules(
+    input: PassengerInput
+  ): Passenger @aws_api_key @aws_iam
+
+  getPaymentSession (input: String): String @aws_api_key @aws_iam
+
+  updateLfsEupgrade (input: String): String @aws_api_key @aws_iam
 }
 
-type Passenger {
+type Mutation {
+  addPassengers (
+    input: PassengerInput
+  ): Passenger @aws_api_key @aws_iam
+  orderCreation (
+    input: OrderCreationInput!
+  ): OrderCreationResponse! @aws_iam
+}
+
+type Subscription  @aws_api_key @aws_iam {
+  onOrderCreated (subscriptionId: String!): OrderCreationResponse
+  @aws_subscribe(mutations: ["orderCreation"])
+}
+
+input PassengerInput {
+  itineraries: [ItineraryInput]!
+}
+
+
+
+input ItineraryInput {
+  id: String!
+}
+
+input LucasTest3Input {
+  bookingSessionId: String!
+  id: String
+  testJson: String
+}
+
+input LfsInput {
+  itineraries: [ItineraryInput]!
+}
+
+input OrderCreationInput {
+  subscriptionId: String!
+  pnrStatus: String
+  pnrNumber: String
+}
+
+input OrderCreationSubscriptionInput {
+  subscriptionId: String!
+  what: String
+}
+
+type OrderCreationResponse @aws_api_key @aws_iam {
+  isOrderCreated: Boolean
+  subscriptionId: String
+}
+
+type Passenger @aws_api_key @aws_iam {
   name: String!
+}
+
+type Passengerv2 @aws_api_key @aws_iam {
+  name: String!
+}
+
+type LucasTest3Response @aws_api_key @aws_iam {
+  id: String
+  test1: String
+  test2: String
+  originalJson: String
 }

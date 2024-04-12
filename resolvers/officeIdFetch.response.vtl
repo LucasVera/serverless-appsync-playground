@@ -1,0 +1,7 @@
+#if($context.result)
+  #set ($result = $context.result)
+#else
+  #set ($result = "test")
+#end
+
+#return($util.toJson([{ name: "wgat" }]))

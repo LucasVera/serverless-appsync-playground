@@ -1,0 +1,15 @@
+int:
+  - ${self:custom.appsyncIAMAuthConfig}
+crt:
+  - ${self:custom.appsyncIAMAuthConfig}
+prd:
+
+auth:
+  authentication:
+    type: AWS_IAM
+  additionalAuthentications:
+    - type: API_KEY
+  apiKeys:
+    - name: lucas-test
+      description: Lucas Test api key
+      expiresAfter: 1M

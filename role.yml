@@ -1,0 +1,45 @@
+Type: "AWS::IAM::Role"
+Properties:
+  RoleName: "HelloAppsyncRole-${self:provider.stage}"
+  AssumeRolePolicyDocument:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: "Allow"
+        Principal:
+          Service:
+            - "appsync.amazonaws.com"
+            - "lambda.amazonaws.com"
+        Action: "sts:AssumeRole"
+  Policies:
+    - PolicyName: "aco-logging-policy-${self:provider.stage}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+
+    - PolicyName: "aco-lfs-cache-read-policy-${self:provider.stage}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "dynamodb:*"
+            Resource: "*"
+    - PolicyName: "hello-serverless-read-s3-bucket-${self:provider.stage}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:GetObject"
+              - "s3:GetObjectMetadata"
+              - "s3:PutObject"
+              - "s3:ListBucket"
+            Resource:
+              - !Sub arn:aws:s3:::${self:provider.environment.CONTENT_BUCKET_NAME}
+              - !Sub arn:aws:s3:::${self:provider.environment.CONTENT_BUCKET_NAME}/*
